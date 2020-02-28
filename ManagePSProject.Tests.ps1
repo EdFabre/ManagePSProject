@@ -85,8 +85,6 @@ Describe "ManagePSProject" {
     }
     Context "Test -Publish flag" {
         ManagePSProject -Publish -Test
-        git remote show origin
-
         It ".git directory should exist" {
             (Test-Path "$PesterTestPath\.git") | should be $true
         }
