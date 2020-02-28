@@ -85,13 +85,15 @@ Describe "ManagePSProject" {
     }
     Context "Test -Publish flag" {
         ManagePSProject -Publish -Test
+        git remote show origin
+
         It ".git directory should exist" {
             (Test-Path "$PesterTestPath\.git") | should be $true
         }
-        It "Test that remote repository was pushed to." {
-            git remote show origin
-            (git pull origin master) -eq "Already up to date." | should be $true
-        }
+        # It "Test that remote repository was pushed to." {
+        #     git remote show origin
+        #     (git pull origin master) -eq "Already up to date." | should be $true
+        # }
     }
     
     Set-Location $here
