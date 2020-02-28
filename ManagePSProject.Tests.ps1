@@ -89,7 +89,7 @@ Describe "ManagePSProject" {
             (Test-Path "$PesterTestPath\.git") | should be $true
         }
         It "Test that remote repository was pushed to." {
-            (git pull) -eq "Already up to date." | should be $true
+            (git pull origin master) -eq "Already up to date." | should be $true
         }
     }
     
