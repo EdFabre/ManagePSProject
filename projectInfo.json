@@ -1,0 +1,8 @@
+{
+    "title":  "ManagePSProject",
+    "description":  "This project contains my ManagePSProject module which is used to maintain a powershell project during it's lifecycle.",
+    "version":  "1.0",
+    "author":  "Edge Fabre",
+    "gitRepo":  "https://github.com/EdFabre/ManagePSProject.git",
+    "license":  "NONE"
+}
