@@ -1,12 +1,6 @@
 $modulespath = ($env:psmodulepath -split ";")[0]
-$manageprojectpath = "$modulespath\manageproject"
-
-Write-Host "Creating module directory"
+$manageprojectpath = "$modulespath\ManagePSProject"
 New-Item -Type Container -Force -path $manageprojectpath | out-null
-
-Write-Host "Downloading and installing"
-(new-object net.webclient).DownloadString("https://raw.githubusercontent.com/EdFabre/ManageProject/master/ManageProject.psm1") | Out-File "$manageprojectpath\ManageProject.psm1" 
-
-Write-Host "Installed!"
-Write-Host 'Use "Import-Module ManageProject" to import the module'
-Write-Host 'Use "ManageProject -Init" to run the module'
+Copy-Item "ManagePSProject.psm1" $manageprojectpath
+New-ModuleManifest -Path "$manageprojectpath\ManagePSProject.psd1" -ModuleVersion "1.0" -Author "Edge Fabre" -Description "This project contains my ManagePSProject module which is used to maintain a powershell project during it's lifecycle."
+Publish-Module -Name "ManagePSProject" -NuGetApiKey "oy2gp3tcq45dkjfhji3qb2z2tehtwcke7b2gr6a6kqyjsa"
