@@ -1,3 +1,5 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/m1hbibhfaauy6tbj?svg=true)](https://ci.appveyor.com/project/EdFabre/managepsproject)
+
 # ManagePSProject
 
 This project contains my ManagePSProject module which is used to maintain a powershell project during it's lifecycle.
