@@ -8,5 +8,10 @@ test_script:
   - ps: (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\TestsResults.xml))
   - ps: if ($res.FailedCount -gt 0) { throw "$($res.FailedCount) tests failed."}
   - ps: $env:psmodulepath
+  - ps: $modulespath = ($env:psmodulepath -split ";")[0]
+  - ps: $manageprojectpath = "$modulespath\ManagePSProject"
+  - ps: New-Item -Type Container -Force -path $manageprojectpath | out-null
+  - ps: Set-Location $modulespath
+  - ps: Get-ChildItem
 # after_test:
 #   - ps: Publish-Module -Name "ManagePSProject" -NuGetApiKey "oy2gp3tcq45dkjfhji3qb2z2tehtwcke7b2gr6a6kqyjsa"
