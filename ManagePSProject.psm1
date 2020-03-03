@@ -935,17 +935,26 @@ function ManagePSProject {
             [String]$scriptArgs = ""
         )
 
-        Invoke-Expression ((new-object net.webclient).DownloadString("http://bit.ly/Install-PsWatch"))
+        # Invoke-Expression ((new-object net.webclient).DownloadString("http://bit.ly/Install-PsWatch"))
     
-        Import-Module pswatch
+        # Import-Module pswatch
         # cls
     
-        $MainProjectScript = "$scriptPath\$((GetProjectInfo).main) $scriptArgs"
-        $MainProjectScript
+        $MainProjectScript = "$((GetProjectInfo).main) $scriptArgs"
+        Write-Host ""
+        Write-Host "Starting Development Environment for script: $MainProjectScript"
+        Write-Host ""
+
+        Invoke-Expression "$MainProjectScript"
     
-        Start-Process -FilePath powershell -ArgumentList @("-NoExit", "'$MainProjectScript'")
+        # Start-Process -FilePath powershell -ArgumentList @("-NoExit", "'$MainProjectScript'")
         watch "." | ForEach-Object {
-            Start-Process -FilePath powershell -ArgumentList @("-NoExit", "'$MainProjectScript'")
+            Write-Host ""
+            Write-Host "Changes detected, restarting Development Environment..."
+            Write-Host "Starting Development Environment for script: $MainProjectScript"
+            Write-Host ""
+
+            Invoke-Expression "$MainProjectScript"
         }
     }
 
