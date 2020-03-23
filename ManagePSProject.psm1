@@ -27,6 +27,10 @@
     When set, this flag monitors project for changes in files and restarts main application. Bear in mind, when using this flag, project will not pack.
 .PARAMETER GenUTIL
     When set, this flag generates Utility for Project saved to utils folder.
+.PARAMETER AddDeps
+    When set, this flag adds a powershell github repo as a dependency.
+.PARAMETER ListDeps
+    When set, this flag prints the dependencies added to the project.
 .INPUTS
     Varies
 .OUTPUTS
@@ -42,8 +46,8 @@
     ManagePSProject -SemVer # Returns the current Semantic Version
     ManagePSProject -Develop "Arguments for main script" # Runs application in development mode
     ManagePSProject -GenUTIL # Generates Utility for Project saved to utils folder"
-    ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to projectInfo, can add several by using space delimiter
-    ManagePSProject -ListDeps # Lists this project's dependencies
+    ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to script session, can add several by using space delimiter
+    ManagePSProject -ListDeps # Displays the dependencies of this project
 #>
 
 function ManagePSProject {
@@ -78,7 +82,11 @@ function ManagePSProject {
         [Parameter(Mandatory = $false)]    
         [Switch]$AddDeps,
         [Parameter(Mandatory = $false)]    
-        [Switch]$ListDeps
+        [Switch]$ListDeps,
+        [Parameter(Mandatory = $false)]    
+        [Switch]$LoadDeps,
+        [Parameter(Mandatory = $false)]    
+        [Switch]$GetGitBranchURL
     )
 
     # Project path variables
@@ -93,6 +101,25 @@ function ManagePSProject {
     function isURIWeb($address) {
         $uri = $address -as [System.URI]
         $null -ne $uri.AbsoluteURI -and $uri.Scheme -match '[http|https]'
+    }
+
+    function validateGithubURL {
+        param (
+            [Parameter(Position = 0, Mandatory = $true)]
+            [String]$githubURL
+        )
+
+        if (isURIWeb $githubURL) {
+            if ($githubURL -like "*github.*") {
+                return $true
+            }
+            else {
+                return $false
+            }
+        }
+        else {
+            return $false
+        }
     }
 
     function GetGithubDefaultBranchURL {
@@ -152,37 +179,8 @@ function ManagePSProject {
         }
         $projectInfo | ConvertTo-Json -Depth 100 | Out-File "$projectInfoPath"
         ListDependencies
-
     }
 
-    function ListDependencies {
-        
-        $projectInfo = GetProjectInfo
-        $dependencies = $projectInfo.dependencies
-        $dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
-            $key = $_.Name
-            [PSCustomObject]@{Dependency = $key; Repo = $dependencies."$key" }
-        }
-    }
-
-    function validateGithubURL {
-        param (
-            [Parameter(Position = 0, Mandatory = $true)]
-            [String]$githubURL
-        )
-
-        if (isURIWeb $githubURL) {
-            if ($githubURL -like "*github.*") {
-                return $true
-            }
-            else {
-                return $false
-            }
-        }
-        else {
-            return $false
-        }
-    }
     function addPSObjectProp {
         param (
             [Parameter(Position = 0, Mandatory = $true)]
@@ -196,40 +194,75 @@ function ManagePSProject {
         return $TempPSOject
     }
 
+    function LoadDependencies {  
+        $projectInfo = GetProjectInfo
+        $dependencies = $projectInfo.dependencies
     
-
-    function ImportUtils {
-        $modulespath = ($env:psmodulepath -split ";")[0]
-
-        # Remove the module from current session
-        Get-ChildItem -Path $utilsPath -Filter *.zip | ForEach-Object {
         
-            $OriginalModName = $($_.BaseName)
-            $utilModulePath = "$utilsPath\$OriginalModName"
-            if (Test-Path $utilModulePath) {
-                Remove-Item -Recurse -Force -Path $utilModulePath | Out-Null
-            }
-            Expand-Archive -Path $_.FullName -DestinationPath "$utilModulePath" | Out-Null
+        # Used to store dependency disk locations
+        $RepoInstallPackages = New-Object -TypeName psobject
+    
+        $dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
+            $key = $_.Name
+            $value = GetGithubDefaultBranchURL "$($dependencies."$key")"
+            
+            LoadRepo -InstallPackagesObj $RepoInstallPackages -RepoName $key -RepoURL $value
+        }  
+        return $RepoInstallPackages
+    }
 
-            $ModuleName = $OriginalModName.Split('-')
+    function LoadRepo {
+        param (
+            [Parameter(Mandatory = $true)]    
+            [String]$RepoName,
+            [Parameter(Mandatory = $true)]    
+            [String]$RepoURL,
+            [Parameter(Mandatory = $true)]    
+            [Object]$InstallPackagesObj
+        )
+    
+        $zippedGitRepo = "$utilsPath\$RepoName.zip"
+        # Update old zipped repo
+        if (Test-Path $zippedGitRepo) {
+            Remove-Item -Recurse -Force -Path $zippedGitRepo -ErrorAction SilentlyContinue | Out-Null
+        }
+        Invoke-WebRequest -Uri $RepoURL -OutFile $zippedGitRepo
+    
+        $utilModulePath = "$utilsPath\$($RepoName)_000"
+        if (Test-Path $utilModulePath) {
+            Remove-Item -Recurse -Force -Path $utilModulePath -ErrorAction SilentlyContinue | Out-Null
+        }
+        Expand-Archive -Path $zippedGitRepo -DestinationPath "$utilModulePath" | Out-Null
+    
+        Get-ChildItem $utilModulePath | ForEach-Object {
+            $ModuleName = ($_.BaseName).Split('-')
+    
             if ($ModuleName.length -eq 2) {
                 $ModuleName = $ModuleName[0]
-                $psmodulepath = "$modulespath\$ModuleName"
-
-                if (Test-Path $psmodulepath) {
-                    Remove-Item -Recurse -Force -Path $psmodulepath | Out-Null
+                $modulePath = "$utilsPath\$ModuleName"
+    
+                if (Test-Path $modulePath) {
+                    Remove-Item -Recurse -Force -Path $modulePath -ErrorAction SilentlyContinue | Out-Null
                 }
-                $drillOneUtilModPath = "$utilModulePath\$OriginalModName"
-
+                $drillOneUtilModPath = "$utilModulePath\$($_.BaseName)"
                 if (Test-Path $drillOneUtilModPath) {
-                    Copy-Item -Path "$drillOneUtilModPath" -Destination $psmodulepath -Recurse -Force
+                    Copy-Item -Path "$drillOneUtilModPath" -Destination $modulePath -Recurse -Force
                 } 
-                # Import-Module $ModuleName
-                # Remove-Item -Recurse -Force -Path $tempImportModPath | Out-Null
+                $InstallPackagesObj | Add-Member -MemberType NoteProperty -Name $ModuleName -Value @($modulePath, $utilModulePath, $zippedGitRepo, $RepoURL) -Force
             }
-            Remove-Item -Recurse -Force -Path $utilModulePath | Out-Null
         }
     }
+
+    function ListDependencies {
+        
+        $projectInfo = GetProjectInfo
+        $dependencies = $projectInfo.dependencies
+        $dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
+            $key = $_.Name
+            [PSCustomObject]@{Dependency = $key; Repo = $dependencies."$key" }
+        }
+    }
+
     function FlushProjectReleases {
         if (Test-Path $releasesPath) {
             Remove-Item -Path "$releasesPath" -Recurse -Force
@@ -1266,8 +1299,8 @@ ManagePSProject -SetInfo # Sets information of project
 ManagePSProject -SemVer # Returns the current Semantic Version
 ManagePSProject -Develop "Arguments for main script" # Runs application in development mode
 ManagePSProject -GenUTIL # Generates Utility for Project saved to utils folder
-ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to projectInfo, can add several by using space delimiter
-ManagePSProject -ListDeps # Lists this project's dependencies
+ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to script session, can add several by using space delimiter
+ManagePSProject -ListDeps # Displays the dependencies of this project
 ``````
 
 ### Main Script
@@ -1503,8 +1536,14 @@ function $utilTitle {
     elseif ($AddDeps) {
         AddRepos($ARGorSTRING)
     }
+    elseif ($LoadDeps) {
+        LoadDependencies
+    }
     elseif ($ListDeps) {
         ListDependencies
+    }
+    elseif ($GetGitBranchURL) {
+        GetGithubDefaultBranchURL($ARGorSTRING)
     }
     else {
         if ($Test -eq $false) {
@@ -1523,8 +1562,8 @@ ManagePSProject -SetInfo # Sets information of project
 ManagePSProject -SemVer # Returns the current Semantic Version
 ManagePSProject -Develop `"Arguments for main script`" # Runs application in development mode
 ManagePSProject -GenUTIL # Generates Utility for Project saved to utils folder
-ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to projectInfo, can add several by using space delimiter
-ManagePSProject -ListDeps # Lists this project's dependencies
+ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to script session, can add several by using space delimiter
+ManagePSProject -ListDeps # Displays the dependencies of this project
 "@   
         }
     }
