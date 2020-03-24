@@ -10,5 +10,4 @@ test_script:
 
 # after_test:
   - ps: New-ModuleManifest -Path "ManagePSProject.psd1" -RootModule "ManagePSProject.psm1" -FunctionsToExport "*" -ModuleVersion "$($env:MAJOR_VERSION).$($env:MINOR_VERSION).$($env:APPVEYOR_BUILD_NUMBER)" -Author "Edge Fabre" -Description "This project contains my ManagePSProject module which is used to maintain a powershell project during it's lifecycle."
-  - ps: Get-Content "ManagePSProject.psd1"
-  # - ps: Publish-Module -Name "ManagePSProject" -NuGetApiKey "$($env:NUGET_APIKEY)"
+  - ps: Publish-Module -Name "ManagePSProject" -NuGetApiKey "$($env:NUGET_APIKEY)"
