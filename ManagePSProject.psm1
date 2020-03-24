@@ -32,7 +32,7 @@
 .PARAMETER ListDeps
     When set, this flag prints the dependencies added to the project.
 .INPUTS
-    Varies
+    Optional Switches
 .OUTPUTS
     Varies based on Inputs
 .EXAMPLE
