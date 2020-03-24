@@ -1228,10 +1228,64 @@ param (
 `$utilsPath = "`$scriptPath\utils"
 `$releasesPath = "`$scriptPath\releases"
 
-# Imports custom Dot Sourced Powershell Scripts and dependency scripts
-Get-ChildItem -Path `$utilsPath -Filter *.ps1 | ForEach-Object {
-    . `$_.FullName
+# Imports Powershell Scripts listed in projectInfo.json and located in utils
+function LoadAllDeps {
+    function TestModActive {
+        param (
+            [Parameter(Mandatory = `$true)]
+            [String]`$ModuleName,
+            [Parameter(Mandatory = `$false)]
+            [Switch]`$Silent
+        )
+        if (`$null -ne (Get-Module `$ModuleName)) {
+            if (`$Silent -ne `$true) {
+                Write-Host "Dependency: '`$ModuleName', Installed"
+            }
+            return `$true
+        }
+        else {
+            if (`$Silent -ne `$true) {
+                Write-Host "Dependency: '`$ModuleName', NOT installed"
+            }
+            return `$false
+        }
+    }
+
+    `$depLoadResults = New-Object -TypeName psobject
+
+    `$RepoInstallPackages = (ManagePSProject -LoadDeps)
+    `$RepoInstallPackages | Get-Member -MemberType NoteProperty | ForEach-Object {
+        `$key = `$_.Name
+        `$modulePath = `$(`$RepoInstallPackages."`$key")[0]
+        `$utilModulePath = `$(`$RepoInstallPackages."`$key")[1]
+        `$zippedGitRepo = `$(`$RepoInstallPackages."`$key")[2]
+        `$RepoURL = `$(`$RepoInstallPackages."`$key")[3]
+        Import-Module `$modulePath -Force
+        `$repoRes = if ((TestModActive `$key -Silent) -eq `$true) { "Installed" } else { "Not Installed" }
+    
+        `$depLoadResults | Add-Member -MemberType NoteProperty -Name `$key -Value @(`$repoRes, `$RepoURL) -Force
+        Remove-Item -Recurse -Force -Path `$modulePath -ErrorAction SilentlyContinue | Out-Null
+        Remove-Item -Recurse -Force -Path `$utilModulePath -ErrorAction SilentlyContinue | Out-Null
+        Remove-Item -Recurse -Force -Path `$zippedGitRepo -ErrorAction SilentlyContinue | Out-Null
+    }
+
+    # Loads Local Scripts in 'utils' folder
+    Get-ChildItem -Path `$utilsPath -Filter *.ps1 | ForEach-Object {
+        Import-Module `$_.FullName -Force
+        `$repoRes = if ((TestModActive `$_.BaseName -Silent) -eq `$true) { "Installed" } else { "Not Installed" }
+    
+        `$depLoadResults | Add-Member -MemberType NoteProperty -Name `$_.BaseName -Value @(`$repoRes, "`$(`$_.FullName)") -Force
+    }
+
+    `$formattedDepResults = @()
+    `$depLoadResults | Get-Member -MemberType NoteProperty | ForEach-Object {
+        `$key = `$_.Name
+        `$formattedDepResults += [PSCustomObject]@{Dependency = `$key; Status = `$(`$depLoadResults."`$key")[0]; Source = `$(`$depLoadResults."`$key")[1] }
+    }
+    `$formattedDepResults | Format-Table -AutoSize
 }
+
+. LoadAllDeps 
 
 Write-Log "Project Path Variables
 Script Path: `$scriptPath
@@ -1240,7 +1294,8 @@ Installer Path: `$installersPath
 Util Path: `$utilsPath
 Releases Path: `$releasesPath" "Debug"
 
-# Insert Code Logic Below
+### DO NOT ALTER ABOVE CODE ###
+### Insert Code Logic Below ###
 
 "@
 
@@ -1287,17 +1342,19 @@ This project uses the ManagePSProject module which is used to maintain this proj
 
 ``````powershell
 # Possible Commands
-ManagePSProject [-Build] [-Reset] [-Publish] [-Flush] [-Init] [-GetInfo] [-SetInfo] [SemVer]
+ManagePSProject [-Build] [-Reset] [-Publish] [-Flush] 
+                [-Init] [-GetInfo] [-SetInfo] [-SemVer] 
+                [-Develop] [-GenUTIL] [-AddDeps] [-ListDeps]
 
 ManagePSProject -Build # Packages project and increments version number
 ManagePSProject -Reset # Resets project's info
-ManagePSProject -Publish "Sample Commit Message" # Pushes this repository to remote git repo
+ManagePSProject -Publish `"Sample Commit Message`" # Pushes this repository to remote git repo
 ManagePSProject -Flush # Clears 'releases' folder
 ManagePSProject -Init # Initializes projectinfo config file for the project and builds project environment
 ManagePSProject -GetInfo # Returns the current information of project
 ManagePSProject -SetInfo # Sets information of project
 ManagePSProject -SemVer # Returns the current Semantic Version
-ManagePSProject -Develop "Arguments for main script" # Runs application in development mode
+ManagePSProject -Develop `"Arguments for main script`" # Runs application in development mode
 ManagePSProject -GenUTIL # Generates Utility for Project saved to utils folder
 ManagePSProject -AddDeps "https://github.com/random/repo" # Adds a powershell github repo to script session, can add several by using space delimiter
 ManagePSProject -ListDeps # Displays the dependencies of this project
